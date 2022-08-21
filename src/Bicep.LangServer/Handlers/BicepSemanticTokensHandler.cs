@@ -60,7 +60,7 @@ namespace Bicep.LanguageServer.Handlers
 
         protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities) => new()
         {
-            DocumentSelector = DocumentSelectorFactory.Create(),
+            DocumentSelector = DocumentSelectorFactory.CreateForBicepAndParams(),
             Legend = this.legend,
             Full = new SemanticTokensCapabilityRequestFull
             {

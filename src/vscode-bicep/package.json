@@ -100,7 +100,17 @@
           "bicep"
         ],
         "extensions": [
-          ".bicep",
+          ".bicep"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "bicep-params",
+        "aliases": [
+          "Bicep Parameters",
+          "Bicep Params"
+        ],
+        "extensions": [
           ".bicepparam"
         ],
         "configuration": "./language-configuration.json"

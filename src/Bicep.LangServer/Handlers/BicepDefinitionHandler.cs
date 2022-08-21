@@ -142,7 +142,7 @@ namespace Bicep.LanguageServer.Handlers
 
         protected override DefinitionRegistrationOptions CreateRegistrationOptions(DefinitionCapability capability, ClientCapabilities clientCapabilities) => new()
         {
-            DocumentSelector = DocumentSelectorFactory.Create()
+            DocumentSelector = DocumentSelectorFactory.CreateForBicepAndParams()
         };
 
         private Task<LocationOrLocationLinks> HandleUnboundSymbolLocationAsync(DefinitionParams request, CompilationContext context)
