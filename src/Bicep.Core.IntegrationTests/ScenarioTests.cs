@@ -4052,5 +4052,48 @@ resource queueAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/authori
             result.Template.Should().HaveValueAtPath("$.resources[2].name", "[format('{0}/{1}/{2}', variables('Names')[0], variables('Service_Bus_Queues')[copyIndex()], 'Listen')]");
             result.Template.Should().HaveValueAtPath("$.resources[2].dependsOn", new JArray("[resourceId('Microsoft.ServiceBus/namespaces/queues', variables('Names')[0], variables('Service_Bus_Queues')[copyIndex()])]"));
         }
+
+        [TestMethod]
+        public void Test_Issue4453_WithSymbolicNamesEnabled()
+        {
+            var context = new CompilationHelper.CompilationHelperContext(Features: BicepTestConstants.CreateFeaturesProvider(TestContext, symbolicNameCodegenEnabled: true));
+            var result = CompilationHelper.Compile(context, @"
+
+param aksCluster object
+
+var defaultAgentPool = {
+  virtualNetwork: {
+    subscriptionId: subscription().subscriptionId
+    resourceGroup: 'dummy'
+    virtualNetworkName: ''
+    subnetName: ''
+  }
+}
+
+resource virtualNetworks 'Microsoft.Network/virtualNetworks@2021-08-01' existing = [for agentPool in aksCluster.agentPools: {
+  name: union(defaultAgentPool, agentPool).virtualNetwork.virtualNetworkName
+  scope: resourceGroup(union(defaultAgentPool, agentPool).virtualNetwork.subscriptionId, agentPool.virtualNetwork.resourceGroup)
+}]
+
+// // Get existing subnets
+resource subnets 'Microsoft.Network/virtualNetworks/subnets@2021-08-01' existing = [for (agentPool, i) in aksCluster.agentPools: {
+  name: union(defaultAgentPool, agentPool).virtualNetwork.subnetName
+  parent: virtualNetworks[i]
+}]
+
+
+var agentPoolProfiles = [for (agentPool, i) in aksCluster.agentPools: {
+  // only agentPoolProfiles has name as property, agentPools do not have it
+  nameProperty: {
+    name: agentPool.name
+  }
+  commonProperties: {
+    vnetSubnetID: empty(union(defaultAgentPool, agentPool).virtualNetwork.subnetName) ? null : subnets[i].id
+  }
+}]
+");
+
+            result.ExcludingLinterDiagnostics().Should().NotHaveAnyDiagnostics();
+        }
     }
 }
