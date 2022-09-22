@@ -4054,6 +4054,31 @@ resource queueAuthorizationRules 'Microsoft.ServiceBus/namespaces/queues/authori
         }
 
         [TestMethod]
+        public void Test_Foo()
+        {
+            var context = new CompilationHelper.CompilationHelperContext(Features: BicepTestConstants.CreateFeaturesProvider(TestContext, symbolicNameCodegenEnabled: true));
+            var result = CompilationHelper.Compile(context, @"
+
+resource foo 'Microsoft.Network/dnsZones@2018-05-01' = [for (item, index) in []: {
+  name: 'hello${index}'
+  location: resourceGroup().location
+}]
+
+
+resource bar 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: 's'
+  properties: {
+    principalId: 's'
+    roleDefinitionId: 's'
+  }
+  scope: foo[0]
+}
+");
+
+            result.ExcludingLinterDiagnostics().Should().NotHaveAnyDiagnostics();
+        }
+
+        [TestMethod]
         public void Test_Issue4453_WithSymbolicNamesEnabled()
         {
             var context = new CompilationHelper.CompilationHelperContext(Features: BicepTestConstants.CreateFeaturesProvider(TestContext, symbolicNameCodegenEnabled: true));
