@@ -23,6 +23,7 @@ export class BicepCacheContentProvider
          *   the language server is called for a particular file only once
          * Moving this to an event listener instead avoids these issues entirely.
          */
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.tryFixCacheContentLanguage(document);
       })
     );
@@ -64,7 +65,9 @@ export class BicepCacheContentProvider
     return moduleReferenceWithLeadingSeparator.substring(1, colonIndex);
   }
 
-  private tryFixCacheContentLanguage(document: vscode.TextDocument) {
+  private async tryFixCacheContentLanguage(
+    document: vscode.TextDocument
+  ): Promise<void> {
     if (
       document.uri.scheme === "bicep-cache" &&
       document.languageId === "plaintext"
@@ -72,7 +75,7 @@ export class BicepCacheContentProvider
       // the file is showing content from the bicep cache and the language is still set to plain text
       // we should try to correct it
       const scheme = this.getModuleReferenceScheme(document);
-      vscode.languages.setTextDocumentLanguage(
+      await vscode.languages.setTextDocumentLanguage(
         document,
         this.getLanguageId(scheme)
       );
