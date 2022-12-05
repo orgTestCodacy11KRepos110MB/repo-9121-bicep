@@ -20,7 +20,7 @@ export async function updateUiContext(): Promise<void> {
     }
   }
 
-  commands.executeCommand(
+  await commands.executeCommand(
     "setContext",
     "bicep.cannotDecompile",
     cannotDecompile

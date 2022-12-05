@@ -148,40 +148,45 @@ export async function activate(context: ExtensionContext): Promise<void> {
         extension.register(
           window.onDidChangeActiveTextEditor(
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            (_editor: TextEditor | undefined) => {
-              updateUiContext();
+            async (_editor: TextEditor | undefined) => {
+              await updateUiContext();
             }
           )
         );
         extension.register(
+          workspace.onDidChangeTextDocument(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            async (_e: TextDocumentChangeEvent) => {
+              await updateUiContext();
+            }
+          )
+        );
+
+        extension.register(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          workspace.onDidChangeTextDocument((_e: TextDocumentChangeEvent) => {
-            updateUiContext();
+          workspace.onDidCloseTextDocument(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            async (_d: TextDocument) => {
+              await updateUiContext();
+            }
+          )
+        );
+
+        extension.register(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          workspace.onDidOpenTextDocument(async (_d: TextDocument) => {
+            await updateUiContext();
           })
         );
 
         extension.register(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          workspace.onDidCloseTextDocument((_d: TextDocument) => {
-            updateUiContext();
+          workspace.onDidSaveTextDocument(async (_d: TextDocument) => {
+            await updateUiContext();
           })
         );
 
-        extension.register(
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          workspace.onDidOpenTextDocument((_d: TextDocument) => {
-            updateUiContext();
-          })
-        );
-
-        extension.register(
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          workspace.onDidSaveTextDocument((_d: TextDocument) => {
-            updateUiContext();
-          })
-        );
-
-        updateUiContext();
+        await updateUiContext();
 
         await languageClient.start();
         getLogger().info("Bicep language service started.");
