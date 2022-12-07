@@ -17,6 +17,8 @@ using Bicep.Core.Rewriters;
 using Bicep.Core.Semantics;
 using Bicep.Core.Syntax;
 using Bicep.Core.Workspaces;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace Bicep.Decompiler;
 
@@ -101,6 +103,53 @@ public class BicepDecompiler
             PrintFiles(workspace));
     }
 
+    public string? DecompileJson(string jsonInput, DecompileOptions? options = null) //asdfg
+    {
+        var workspace = new Workspace();
+        var decompileQueue = new Queue<(Uri, Uri)>();
+        options ??= new DecompileOptions();
+
+        //asdfg get rid of some of the params?
+        var bicepUri = new Uri("file://from-clipboard-asdfg.json", UriKind.Absolute);
+        var syntax = TemplateConverter.DecompileJson(workspace, fileResolver, bicepUri, jsonInput, options);
+        //var bicepFile = SourceFileFactory.CreateBicepFile(bicepUri, program.ToText());
+        //workspace.UpsertSourceFile(bicepFile);
+
+        //foreach (var module in program.Children.OfType<ModuleDeclarationSyntax>())
+        //{
+        //    var moduleRelativePath = SyntaxHelper.TryGetModulePath(module, out _);
+        //    if (moduleRelativePath == null ||
+        //        !LocalModuleReference.Validate(moduleRelativePath, out _) ||
+        //        !Uri.TryCreate(bicepUri, moduleRelativePath, out var moduleUri))
+        //    {
+        //        // Do our best, but keep going if we fail to resolve a module file
+        //        continue;
+        //    }
+
+        //    if (!workspace.TryGetSourceFile(moduleUri, out _) && jsonTemplateUrisByModule.TryGetValue(module, out var linkedTemplateUri))
+        //    {
+        //        decompileQueue.Enqueue((linkedTemplateUri, moduleUri));
+        //    }
+        //}
+        //}
+
+        //await RewriteSyntax(workspace, entryBicepUri, semanticModel => new ParentChildResourceNameRewriter(semanticModel));
+        //await RewriteSyntax(workspace, entryBicepUri, semanticModel => new DependsOnRemovalRewriter(semanticModel));
+        //await RewriteSyntax(workspace, entryBicepUri, semanticModel => new ForExpressionSimplifierRewriter(semanticModel));
+        //for (var i = 0; i < 5; i++)
+        //{
+        //    // This is a little weird. If there are casing issues nested inside casing issues (e.g. in an object), then the inner casing issue will have no type information
+        //    // available, as the compilation will not have associated a type with it (since there was no match on the outer object). So we need to correct the outer issue first,
+        //    // and then move to the inner one. We need to recompute the entire compilation to do this. It feels simpler to just do this in passes over the file, rather than on demand.
+        //    if (!await RewriteSyntax(workspace, entryBicepUri, semanticModel => new TypeCasingFixerRewriter(semanticModel)))
+        //    {
+        //        break;
+        //    }
+        //}
+
+        return syntax is null ? null : PrintSyntax(syntax);
+    }
+
     private static ImmutableDictionary<Uri, string> PrintFiles(Workspace workspace)
     {
         var filesToSave = new Dictionary<Uri, string>();
@@ -111,11 +160,18 @@ public class BicepDecompiler
                 continue;
             }
 
-            filesToSave[fileUri] = PrettyPrinter.PrintProgram(bicepFile.ProgramSyntax, new PrettyPrintOptions(NewlineOption.LF, IndentKindOption.Space, 2, false));
+            filesToSave[fileUri] = PrettyPrinter.PrintProgram(bicepFile.ProgramSyntax, GetPrettyPrintOptions());
         }
 
         return filesToSave.ToImmutableDictionary();
     }
+
+    private static string PrintSyntax(SyntaxBase syntax)
+    {
+        return PrettyPrinter.PrintSyntax(syntax, GetPrettyPrintOptions());
+    }
+
+    private static PrettyPrintOptions GetPrettyPrintOptions() => new PrettyPrintOptions(NewlineOption.LF, IndentKindOption.Space, 2, false);
 
     private async Task<bool> RewriteSyntax(Workspace workspace, Uri entryUri, Func<SemanticModel, SyntaxRewriteVisitor> rewriteVisitorBuilder)
     {

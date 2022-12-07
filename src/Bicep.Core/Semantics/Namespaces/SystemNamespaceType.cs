@@ -798,7 +798,7 @@ namespace Bicep.Core.Semantics.Namespaces
             return ConvertJsonToBicepSyntax(functionValue as JToken ?? throw new InvalidOperationException($"Expecting function to return {nameof(JToken)}, but {functionValue?.GetType().ToString() ?? "null"} received."));
         }
 
-        private static SyntaxBase ConvertJsonToBicepSyntax(JToken token) =>
+        private static SyntaxBase ConvertJsonToBicepSyntax(JToken token) => //asdfg can use this?
         token switch
         {
             JObject @object => SyntaxFactory.CreateObject(@object.Properties().Select(x => SyntaxFactory.CreateObjectProperty(x.Name, ConvertJsonToBicepSyntax(x.Value)))),

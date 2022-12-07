@@ -68,6 +68,7 @@ namespace Bicep.LanguageServer.Handlers
         public const string? PasteType_None = null;
         public const string PasteType_FullTemplate = "fullTemplate"; // Full template
         public const string PasteType_ResourceObject = "resources"; // Single resource or list of multiple resources
+        public const string PasteType_JsonValue = "jsonValue"; // Single JSON value (number, object, array etc)
 
         public BicepDecompileForPasteCommandHandler(
             ISerializer serializer,
@@ -97,6 +98,36 @@ namespace Bicep.LanguageServer.Handlers
             var (pasteType, constructedJsonTemplate, needsDisclaimer) = ConstructFullJsonTemplate(output, json);
             if (pasteType is null)
             {
+                //asdfg
+                Log(output, String.Format(LangServerResources.Decompile_DecompilationStartMsg, "clipboard text"));
+                var singleFileResolver = new SingleFileResolver(JsonDummyUri, json); //asdfg
+
+                var decompiler = new BicepDecompiler(this.bicepCompiler, singleFileResolver);
+                var options = new DecompileOptions() //asdfg
+                {
+                    // For partial template pastes, we don't error out on missing parameters and variables because they won't
+                    //   ever have definitions in the pasted portion
+                    AllowMissingParamsAndVars = pasteType != PasteType_FullTemplate,
+                    // ... but don't allow them in nested templates, which should be fully complete and valid
+                    AllowMissingParamsAndVarsInNestedTemplates = false
+                };
+                string? bicepValue = decompiler.DecompileJson(json, options);
+                if (bicepValue is not null) 
+                {
+                    return (
+                        new BicepDecompileForPasteCommandResult(decompileId, output.ToString(), PasteType_JsonValue, null, bicepValue, null),
+                        successTelemetry:
+                            // Don't log telemetry if we're just determining if we can paste, because this will happen a lot
+                            //   (on changing between editors for instance)
+                            queryCanPaste ? null //asdfg but we don't call back for telemetry if we use the result
+                            : BicepTelemetryEvent.DecompileForPaste(decompileId, pasteType, json.Length, null)
+                    );
+                }
+
+
+
+
+
                 // It's not anything we know how to convert to Bicep
                 return (
                     new BicepDecompileForPasteCommandResult(decompileId, output.ToString(), null, null, null, null),
@@ -313,7 +344,7 @@ namespace Bicep.LanguageServer.Handlers
                     return null;
                 }
 
-                return JContainer.Load(reader, new JsonLoadSettings
+                return JToken.Load(reader, new JsonLoadSettings
                 {
                     CommentHandling = CommentHandling.Ignore,
                 });

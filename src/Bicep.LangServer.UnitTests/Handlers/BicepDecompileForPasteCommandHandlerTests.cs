@@ -34,6 +34,7 @@ using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using static Bicep.LangServer.UnitTests.Handlers.BicepDecompileForPasteCommandHandlerTests;
 using static Bicep.LanguageServer.Telemetry.BicepTelemetryEvent;
 using IOFileSystem = System.IO.Abstractions.FileSystem;
 
@@ -62,6 +63,7 @@ namespace Bicep.LangServer.UnitTests.Handlers
             None,
             FullTemplate,
             Resources,
+            JsonValue,
         }
 
         private async Task TestDecompileForPaste(
@@ -84,6 +86,7 @@ namespace Bicep.LangServer.UnitTests.Handlers
                 PasteType.None => BicepDecompileForPasteCommandHandler.PasteType_None,
                 PasteType.FullTemplate => BicepDecompileForPasteCommandHandler.PasteType_FullTemplate,
                 PasteType.Resources => BicepDecompileForPasteCommandHandler.PasteType_ResourceObject,
+                PasteType.JsonValue => BicepDecompileForPasteCommandHandler.PasteType_JsonValue,
                 _ => throw new NotImplementedException(),
             });
         }
@@ -260,8 +263,18 @@ random characters
                     }}
                   }}
             }}",
-            PasteType.None,
-            null,
+            PasteType.JsonValue,
+            // Treats it simply as a JSON object
+            $@"{{
+                '$schema': {{
+                }}
+                parameters: {{
+                    location: {{
+                        type: 'string'
+                        defaultValue: resourceGroup().location
+                    }}
+                }}
+            }}",
             DisplayName = "Schema not a string"
         )]
         public async Task FullTemplate(string json, PasteType expectedPasteType, string expectedBicep, string? errorMessage = null)
@@ -392,62 +405,50 @@ random characters
         }
 
         [TestMethod]
-        public async Task JustString_WithDoubleQuotes_CantPaste()
-        {
-            string json = @"""just a string with double quotes""";
-            await TestDecompileForPaste(
-                    json: json,
-                    PasteType.None,
-                    expectedErrorMessage: null,
-                    expectedBicep: null);
-        }
-
-        [TestMethod]
-        public async Task JustString_WithSingleQuotes_CantPaste()
-        {
-            string json = @"'just a string with double quotes'";
-            await TestDecompileForPaste(
-                    json: json,
-                    PasteType.None,
-                    expectedErrorMessage: null,
-                    expectedBicep: null);
-        }
-
-        [TestMethod]
-        public async Task NonResourceObject_CantPaste()
-        {
-            string json = @"{""hello"": ""there""}";
-            await TestDecompileForPaste(
-                    json: json,
-                    PasteType.None,
-                    expectedErrorMessage: null,
-                    expectedBicep: null);
-        }
-
-        [TestMethod]
-        public async Task NonResourceObject_WrongPropertyType_Object_CantPaste()
+        public async Task NonResourceObject_WrongPropertyType_Object_PastesAsSimpleObject()
         {
             string json = @$"
                 {Resource1Json.Replace("\"2021-02-01\"", "{}")}
             ";
             await TestDecompileForPaste(
                     json: json,
-                    PasteType.None,
+                    PasteType.JsonValue,
                     expectedErrorMessage: null,
-                    expectedBicep: null);
+                    expectedBicep: @"
+                        {
+                            type: 'Microsoft.Storage/storageAccounts'
+                            apiVersion: {
+                            }
+                            name: 'name1'
+                            location: 'eastus'
+                            kind: 'StorageV2'
+                            sku: {
+                                name: 'Premium_LRS'
+                            }
+                        }");
         }
 
         [TestMethod]
-        public async Task NonResourceObject_WrongPropertyType_Number_CantPaste2()
+        public async Task NonResourceObject_WrongPropertyType_Number_PastesAsSimpleObject()
         {
             string json = @$"
                 {Resource1Json.Replace("\"2021-02-01\"", "1234")}
             ";
             await TestDecompileForPaste(
                     json: json,
-                    PasteType.None,
+                    PasteType.JsonValue,
                     expectedErrorMessage: null,
-                    expectedBicep: null);
+                    expectedBicep: @"
+                        {
+                            type: 'Microsoft.Storage/storageAccounts'
+                            apiVersion: 1234
+                            name: 'name1'
+                            location: 'eastus'
+                            kind: 'StorageV2'
+                            sku: {
+                                name: 'Premium_LRS'
+                            }
+                        }");
         }
 
         [TestMethod]
@@ -494,7 +495,7 @@ random characters
                           ""name"": ""Premium_LRS""
                         }
                 }
-            ";            
+            ";
 
             await TestDecompileForPaste(
                     json: json,
@@ -614,7 +615,7 @@ random characters
                     /* And this
                     also */
 
-            { Resource1Json}
+            {Resource1Json}
                     // This is a comment
                     // So is this
                     /* And this
@@ -629,7 +630,7 @@ random characters
                     // So is this
                     /* And this
                     also */";
-;
+            ;
             string expected = $@"
                 {Resource1Bicep}
 
@@ -1015,5 +1016,47 @@ random characters
                     expectedErrorMessage: null,
                     expectedBicep: expected);
         }
+
+        [DataRow(
+            @"'just a string with single quotes'",
+            @"'just a string with single quotes'",
+            DisplayName = "String with single quotes"
+        )]
+        [DataRow(
+            @"""just a string with double quotes""",
+            @"'just a string with double quotes'",
+            DisplayName = "String with double quotes"
+        )]
+        //asdfg escaped quotes
+        [DataRow(
+            @"{""hello"": ""there""}",
+            @"{
+                hello: 'there'
+            }",
+            DisplayName = "simple object"
+        )]
+        [DataRow(
+            @"{""hello there"": ""again""}",
+            @"{
+                'hello there': 'again'
+            }",
+            DisplayName = "object with properties needing quotes"
+        )]
+        [DataTestMethod]
+        public async Task Values_Successful(string json, string expectedBicep)
+        {
+            await TestDecompileForPaste(
+                    json: json,
+                    PasteType.JsonValue,
+                    expectedErrorMessage: null,
+                    expectedBicep: expectedBicep);
+        }
+
+        //asdfg paste just a comment
+        //asdfg bigint
+        //asdfg //converting JSON to bicep syntax and then back to ARM-JSON escapes ARM template expressions (`[variables('')]`, etc.) out of the box
+        //asdfg see ConvertJsonToBicepSyntax for test cases
+        //asdfg what if bicep same as JSON?
     }
 }
+
