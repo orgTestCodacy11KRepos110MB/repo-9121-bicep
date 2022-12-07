@@ -111,43 +111,15 @@ public class BicepDecompiler
 
         //asdfg get rid of some of the params?
         var bicepUri = new Uri("file://from-clipboard-asdfg.json", UriKind.Absolute);
-        var syntax = TemplateConverter.DecompileJson(workspace, fileResolver, bicepUri, jsonInput, options);
-        //var bicepFile = SourceFileFactory.CreateBicepFile(bicepUri, program.ToText());
-        //workspace.UpsertSourceFile(bicepFile);
-
-        //foreach (var module in program.Children.OfType<ModuleDeclarationSyntax>())
-        //{
-        //    var moduleRelativePath = SyntaxHelper.TryGetModulePath(module, out _);
-        //    if (moduleRelativePath == null ||
-        //        !LocalModuleReference.Validate(moduleRelativePath, out _) ||
-        //        !Uri.TryCreate(bicepUri, moduleRelativePath, out var moduleUri))
-        //    {
-        //        // Do our best, but keep going if we fail to resolve a module file
-        //        continue;
-        //    }
-
-        //    if (!workspace.TryGetSourceFile(moduleUri, out _) && jsonTemplateUrisByModule.TryGetValue(module, out var linkedTemplateUri))
-        //    {
-        //        decompileQueue.Enqueue((linkedTemplateUri, moduleUri));
-        //    }
-        //}
-        //}
-
-        //await RewriteSyntax(workspace, entryBicepUri, semanticModel => new ParentChildResourceNameRewriter(semanticModel));
-        //await RewriteSyntax(workspace, entryBicepUri, semanticModel => new DependsOnRemovalRewriter(semanticModel));
-        //await RewriteSyntax(workspace, entryBicepUri, semanticModel => new ForExpressionSimplifierRewriter(semanticModel));
-        //for (var i = 0; i < 5; i++)
-        //{
-        //    // This is a little weird. If there are casing issues nested inside casing issues (e.g. in an object), then the inner casing issue will have no type information
-        //    // available, as the compilation will not have associated a type with it (since there was no match on the outer object). So we need to correct the outer issue first,
-        //    // and then move to the inner one. We need to recompute the entire compilation to do this. It feels simpler to just do this in passes over the file, rather than on demand.
-        //    if (!await RewriteSyntax(workspace, entryBicepUri, semanticModel => new TypeCasingFixerRewriter(semanticModel)))
-        //    {
-        //        break;
-        //    }
-        //}
-
-        return syntax is null ? null : PrintSyntax(syntax);
+        try
+        {
+            var syntax = TemplateConverter.DecompileJson(workspace, fileResolver, bicepUri, jsonInput, options);
+            return syntax is null ? null : PrintSyntax(syntax);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static ImmutableDictionary<Uri, string> PrintFiles(Workspace workspace)

@@ -998,6 +998,7 @@ random characters
             );
         }
 
+        [DataTestMethod]
         [TestMethod]
         public async Task MultipleResourceObjects_ExtraCommaAtEnd_ShouldSucceed()
         {
@@ -1017,6 +1018,7 @@ random characters
                     expectedBicep: expected);
         }
 
+        [DataTestMethod]
         [DataRow(
             @"'just a string with single quotes'",
             @"'just a string with single quotes'",
@@ -1042,7 +1044,11 @@ random characters
             }",
             DisplayName = "object with properties needing quotes"
         )]
-        [DataTestMethod]
+        [DataRow(
+            @"""[resourceGroup().location]""",
+            @"resourceGroup().location",
+            DisplayName = "String with expression"
+        )]
         public async Task Values_Successful(string json, string expectedBicep)
         {
             await TestDecompileForPaste(
@@ -1052,11 +1058,53 @@ random characters
                     expectedBicep: expectedBicep);
         }
 
+        [DataTestMethod]
+        [DataRow(
+            @"{
+              ipConfigurations: [
+                {
+                  name: 'ipconfig1'
+                  properties: {
+                    subnet: {
+                      id: 'subnetRef'
+                    }
+                    privateIPAllocationMethod: 'Dynamic'
+                    publicIpAddress: {
+                      id: resourceId('Microsoft.Network/publicIPAddresses', 'publicIPAddressName')
+                    }
+                  }
+                }
+              ]
+              networkSecurityGroup: {
+                id: resourceId('Microsoft.Network/networkSecurityGroups', 'networkSecurityGroupName')
+              }
+            }",
+            DisplayName = "Bicep object"
+        )]
+        [DataRow(
+            @"3/14/2001",
+            DisplayName = "Date"
+        )]
+        [DataRow(
+            @"""kubernetesVersion"": ""1.15.7""", //asdfg?
+            DisplayName = "\"property\": \"value\""
+        )]
+        public async Task Values_CantPaste(string json)
+        {
+            await TestDecompileForPaste(
+                    json: json,
+                    PasteType.None,
+                    expectedErrorMessage: null,
+                    expectedBicep: null);
+        }
+
         //asdfg paste just a comment
         //asdfg bigint
         //asdfg //converting JSON to bicep syntax and then back to ARM-JSON escapes ARM template expressions (`[variables('')]`, etc.) out of the box
         //asdfg see ConvertJsonToBicepSyntax for test cases
         //asdfg what if bicep same as JSON?
+        //asdfg dates
+        //asdfg comments before and after
     }
 }
 

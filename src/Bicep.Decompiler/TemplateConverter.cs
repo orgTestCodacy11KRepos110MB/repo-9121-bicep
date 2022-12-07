@@ -90,8 +90,10 @@ namespace Bicep.Decompiler
             JToken?/*asdfg?*/ jToken;
             using (var reader = new JsonTextReader(new StringReader(content)))
             {
-                reader.DateParseHandling = DateParseHandling.None;
+                reader.DateParseHandling = DateParseHandling.None;//asdfg?
                 jToken = Load(reader, true/*asdfg*/);
+
+                reader.Read(); //asdfg cause exception if more stuff
             }
             if (jToken is null)
             {
@@ -112,8 +114,8 @@ namespace Bicep.Decompiler
         //asdfg
         private static JToken? Load(JsonTextReader reader, bool readFirst/*asdfg?*/)
         {
-            try
-            {
+            //asdfg try
+            //{
                 if (readFirst && !reader.Read())
                 {
                     return null;
@@ -128,11 +130,12 @@ namespace Bicep.Decompiler
                     CommentHandling = CommentHandling.Ignore,
                     LineInfoHandling = LineInfoHandling.Load,
                 });
-            }
-            catch (JsonException)
-            {
-                return null;
-            }
+            //}
+            //asdfg
+            //catch (JsonException)
+            //{
+            //    return null;
+            //}
         }
 
         private void RegisterNames(IEnumerable<JProperty> parameters, IEnumerable<JToken> resources, IEnumerable<JProperty> variables, IEnumerable<JProperty> outputs)
