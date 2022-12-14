@@ -54,8 +54,7 @@
     "onWebviewPanel:bicep.visualizer"
   ],
   "main": "./out/extension",
-  "enabledApiProposals": [
-  ],
+  "enabledApiProposals": [],
   "contributes": {
     "configurationDefaults": {
       "[bicep]": {
@@ -590,7 +589,10 @@
     "testlocal:e2e": "(export BICEP_LANGUAGE_SERVER_PATH=${INIT_CWD}/../Bicep.LangServer/bin/Debug/net6.0/Bicep.LangServer.dll || set BICEP_LANGUAGE_SERVER_PATH=%INIT_CWD%/../Bicep.LangServer/bin/Debug/net6.0/Bicep.LangServer.dll) && npm run build && npm run build:e2e && npm run test:e2e",
     "clean": "rimraf ./out ./coverage",
     "package": "npm run clean && nbgv-setversion && vsce package --githubBranch main --out ./vscode-bicep.vsix && nbgv-setversion --reset",
-    "packagelocal": "rimraf ./bicepLanguageServer && cp -r ../Bicep.LangServer/bin/Debug/net6.0 ./bicepLanguageServer && npm run package",
+    "$packagelocal.comment": "Creates a VSIX on a local dev machine (Linux/Mac). WARING: Stage local changes first.",
+    "packagelocal": "cp package.json package.json.backup && rimraf ./bicepLanguageServer && cp -r ../Bicep.LangServer/bin/Debug/net6.0 ./bicepLanguageServer && npm run package && cp package.json.backup package.json",
+    "$packagelocal:windows.comment": "Creates a VSIX on a local dev machine (Windows). WARING: Stage local changes first.",
+    "packagelocal:windows": "copy package.json package.json.backup && rimraf ./bicepLanguageServer && mkdir bicepLanguageServer && xcopy ..\\Bicep.LangServer\\bin\\Debug\\net6.0 .\\bicepLanguageServer /s && npm run package && copy package.json.backup package.json",
     "params": "node ./enableParams.js"
   },
   "devDependencies": {
