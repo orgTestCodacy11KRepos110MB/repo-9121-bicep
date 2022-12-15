@@ -27,6 +27,7 @@ using Bicep.Core.Registry;
 using Bicep.Core.Semantics.Namespaces;
 using Bicep.Decompiler;
 using Bicep.LanguageServer.CompilationManager;
+using Bicep.LanguageServer.Handlers;
 using Bicep.LanguageServer.Telemetry;
 using Json.Path;
 using Microsoft.WindowsAzure.ResourceStack.Common.Extensions;
@@ -51,7 +52,7 @@ namespace Bicep.LanguageServer.Handlers
         string? PasteType,
         string? ErrorMessage, // This is null if pasteType == null, otherwise indicates an error trying to decompile to the given paste type
         string? Bicep, // Null if pasteType == null or errorMessage != null
-        string? decompilationDisclaimer // Non-null if the decompilation is not foolproof (for templates, resources etc)
+        string? disclaimer // Non-null if the decompilation is not foolproof (for templates, resources etc)
     );
 
     /// <summary>
@@ -70,6 +71,8 @@ namespace Bicep.LanguageServer.Handlers
         public const string PasteType_ResourceObject = "resources"; // Single resource or list of multiple resources
         public const string PasteType_JsonValue = "jsonValue"; // Single JSON value (number, object, array etc)
 
+        private record ResultAndTelemetry(BicepDecompileForPasteCommandResult Result, BicepTelemetryEvent? SuccessTelemetry);
+
         public BicepDecompileForPasteCommandHandler(
             ISerializer serializer,
             ILanguageServerFacade server,
@@ -86,57 +89,94 @@ namespace Bicep.LanguageServer.Handlers
         {
             return telemetryHelper.ExecuteWithTelemetryAndErrorHandling(async () =>
             {
-                return await DecompileForPaste(parameters.jsonContent, parameters.queryCanPaste);
+                var (result, successTelemetry) = await DecompileForPaste(parameters.jsonContent, parameters.queryCanPaste);
+                return (result, successTelemetry);
             });
         }
 
-        private async Task<(BicepDecompileForPasteCommandResult result, BicepTelemetryEvent? successTelemetry)> DecompileForPaste(string json, bool queryCanPaste)
+        private async Task<ResultAndTelemetry> DecompileForPaste(string json, bool queryCanPaste)
         {
             StringBuilder output = new StringBuilder();
             string decompileId = Guid.NewGuid().ToString();
 
-            var (pasteType, constructedJsonTemplate, needsDisclaimer) = ConstructFullJsonTemplate(output, json);
+            var resultAndTelemetry = await TryConvertFromTemplateOrResources(output, json, decompileId, queryCanPaste);
+            if (resultAndTelemetry is not null)
+            {
+                return resultAndTelemetry;
+            }
+            else
+            {
+                // It's not a template or resource.  Try treating it as a JSON value.
+                resultAndTelemetry = TryConvertFromJson(output, json, decompileId, queryCanPaste);
+                if (resultAndTelemetry is not null)
+                {
+                    return resultAndTelemetry;
+                }
+            }
+
+            // It's not anything we know how to convert to Bicep
+            return new ResultAndTelemetry(
+                new BicepDecompileForPasteCommandResult(
+                    decompileId, output.ToString(), PasteType: null, ErrorMessage: null,
+                    Bicep: null, disclaimer: null),
+                GetSuccessTelemetry(queryCanPaste, decompileId, json, pasteType: null, bicep: null));
+        }
+
+        private static void Log(StringBuilder output, string message)
+        {
+            output.AppendLine(message);
+            Trace.TraceInformation(message);
+        }
+
+        private DecompileOptions GetDecompileOptions(string pasteType)
+        {
+            return new DecompileOptions()
+            {
+                // For partial template pastes, we don't error out on missing parameters and variables because they won't
+                //   ever have definitions in the pasted portion
+                AllowMissingParamsAndVars = pasteType != PasteType_FullTemplate,
+                // ... but don't allow them in nested templates, which should be fully complete and valid
+                AllowMissingParamsAndVarsInNestedTemplates = false
+            };
+        }
+
+        private BicepTelemetryEvent? GetSuccessTelemetry(bool queryCanPaste, string decompileId, string json, string? pasteType, string? bicep)
+        {
+            // Don't log telemetry if we're just determining if we can paste, because this will happen a lot
+            //   (on changing between editors for instance)
+            //asdfg but we don't call back for telemetry if we use the result
+            return queryCanPaste ?
+                null :
+                BicepTelemetryEvent.DecompileForPaste(decompileId, pasteType, json.Length, bicep?.Length);
+        }
+
+        private ResultAndTelemetry? TryConvertFromJson(StringBuilder output, string json, string decompileId, bool queryCanPaste)
+        {
+            Log(output, String.Format(LangServerResources.Decompile_DecompilationStartMsg, "clipboard text"));
+            var singleFileResolver = new SingleFileResolver(JsonDummyUri, json); //asdfg
+
+            var decompiler = new BicepDecompiler(this.bicepCompiler, singleFileResolver);
+            var pasteType = PasteType_JsonValue;
+            var options = GetDecompileOptions(pasteType);
+            var bicep = decompiler.DecompileJson(json, options);
+            if (bicep is not null)
+            {
+                return new ResultAndTelemetry(
+                    new BicepDecompileForPasteCommandResult(
+                        decompileId, output.ToString(), pasteType,
+                        ErrorMessage: null, bicep, disclaimer: null),
+                    GetSuccessTelemetry(queryCanPaste, decompileId, json, pasteType, bicep: null));
+            }
+
+            return null;
+        }
+
+        private async Task<ResultAndTelemetry?> TryConvertFromTemplateOrResources(StringBuilder output, string json, string decompileId, bool queryCanPaste)
+        {
+            var (pasteType, constructedJsonTemplate, needsDisclaimer) = TryConstructFullJsonTemplate(output, json);
             if (pasteType is null)
             {
-                //asdfg
-                Log(output, String.Format(LangServerResources.Decompile_DecompilationStartMsg, "clipboard text"));
-                var singleFileResolver = new SingleFileResolver(JsonDummyUri, json); //asdfg
-
-                var decompiler = new BicepDecompiler(this.bicepCompiler, singleFileResolver);
-                var options = new DecompileOptions() //asdfg
-                {
-                    // For partial template pastes, we don't error out on missing parameters and variables because they won't
-                    //   ever have definitions in the pasted portion
-                    AllowMissingParamsAndVars = pasteType != PasteType_FullTemplate,
-                    // ... but don't allow them in nested templates, which should be fully complete and valid
-                    AllowMissingParamsAndVarsInNestedTemplates = false
-                };
-                string? bicepValue = decompiler.DecompileJson(json, options);
-                if (bicepValue is not null) 
-                {
-                    return (
-                        new BicepDecompileForPasteCommandResult(decompileId, output.ToString(), PasteType_JsonValue, null, bicepValue, null),
-                        successTelemetry:
-                            // Don't log telemetry if we're just determining if we can paste, because this will happen a lot
-                            //   (on changing between editors for instance)
-                            queryCanPaste ? null //asdfg but we don't call back for telemetry if we use the result
-                            : BicepTelemetryEvent.DecompileForPaste(decompileId, pasteType, json.Length, null)
-                    );
-                }
-
-
-
-
-
-                // It's not anything we know how to convert to Bicep
-                return (
-                    new BicepDecompileForPasteCommandResult(decompileId, output.ToString(), null, null, null, null),
-                    successTelemetry:
-                        // Don't log telemetry if we're just determining if we can paste, because this will happen a lot
-                        //   (on changing between editors for instance)
-                        queryCanPaste ? null
-                        : BicepTelemetryEvent.DecompileForPaste(decompileId, pasteType, json.Length, null)
-                );
+                return null;
             }
 
             ImmutableDictionary<Uri, string> filesToSave;
@@ -148,14 +188,7 @@ namespace Bicep.LanguageServer.Handlers
                 var singleFileResolver = new SingleFileResolver(JsonDummyUri, constructedJsonTemplate);
 
                 var decompiler = new BicepDecompiler(this.bicepCompiler, singleFileResolver);
-                var options = new DecompileOptions()
-                {
-                    // For partial template pastes, we don't error out on missing parameters and variables because they won't
-                    //   ever have definitions in the pasted portion
-                    AllowMissingParamsAndVars = pasteType != PasteType_FullTemplate,
-                    // ... but don't allow them in nested templates, which should be fully complete and valid
-                    AllowMissingParamsAndVarsInNestedTemplates = false
-                };
+                var options = GetDecompileOptions(pasteType);
                 (_, filesToSave) = await decompiler.Decompile(JsonDummyUri, BicepDummyUri, options);
             }
             catch (Exception ex)
@@ -166,13 +199,9 @@ namespace Bicep.LanguageServer.Handlers
                 var message = ex.Message;
                 Log(output, $"Decompilation failed: {message}");
 
-                return (
-                    new BicepDecompileForPasteCommandResult(decompileId, output.ToString(), pasteType, message, null, null),
-                    // Don't log telemetry if we're just determining *if* the text on the clipboard can be pasted, because this will happen a lot
-                    successTelemetry: queryCanPaste ? null
-                        : BicepTelemetryEvent.DecompileForPaste(
-                            decompileId, pasteType, json.Length, null)
-                    );
+                return new ResultAndTelemetry(
+                    new BicepDecompileForPasteCommandResult(decompileId, output.ToString(), pasteType, message, Bicep: null, disclaimer: null),
+                    GetSuccessTelemetry(queryCanPaste, decompileId, json, pasteType, bicep: null));
             }
 
             // Show disclaimer and completion
@@ -190,26 +219,17 @@ namespace Bicep.LanguageServer.Handlers
             bicepOutput = bicepOutput.TrimEnd() + "\n";
 
             // Return result
-            return (
+            return new ResultAndTelemetry(
                 new BicepDecompileForPasteCommandResult(decompileId, output.ToString(), pasteType, null, bicepOutput, disclaimerMessage),
                 // Don't log telemetry if we're just determining if we can paste, because this will happen a lot
                 //   (on changing between editors for instance)
-                successTelemetry: queryCanPaste ? null
-                : BicepTelemetryEvent.DecompileForPaste(
-                    decompileId, pasteType, json.Length, bicepOutput.Length)
-                );
-        }
-
-        private static void Log(StringBuilder output, string message)
-        {
-            output.AppendLine(message);
-            Trace.TraceInformation(message);
+                GetSuccessTelemetry(queryCanPaste, decompileId, json, pasteType, bicepOutput));
         }
 
         /// <summary>
         /// If the given JSON matches a pattern that we know how to paste as Bicep, convert it into a full template to be decompiled
         /// </summary>
-        private (string? pasteType, string? fullJsonTemplate, bool needsDisclaimer) ConstructFullJsonTemplate(StringBuilder output, string json)
+        private (string? pasteType, string? fullJsonTemplate, bool needsDisclaimer) TryConstructFullJsonTemplate(StringBuilder output, string json)
         {
             using var streamReader = new StringReader(json);
             using var reader = new JsonTextReader(streamReader);
