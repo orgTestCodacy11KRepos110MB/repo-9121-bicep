@@ -44,13 +44,15 @@
     "onCommand:bicep.forceModulesRestore",
     "onCommand:bicep.insertResource",
     "onCommand:bicep.importKubernetesManifest",
+    "onCommand:bicep.showDeployPane",
     "onCommand:bicep.showSource",
     "onCommand:bicep.showVisualizer",
     "onCommand:bicep.showVisualizerToSide",
     "onCommand:bicep.gettingStarted.copyToClipboard",
     "onCommand:bicep.gettingStarted.createBicepFile",
     "onCommand:bicep.gettingStarted.openBicepFile",
-    "onWebviewPanel:bicep.visualizer"
+    "onWebviewPanel:bicep.visualizer",
+    "onWebviewPanel:bicep.deployPane"
   ],
   "main": "./out/extension",
   "enabledApiProposals": [],
@@ -131,6 +133,12 @@
       }
     ],
     "commands": [
+      {
+        "command": "bicep.showDeployPane",
+        "title": "Show Deployment Pane",
+        "category": "Bicep",
+        "icon": "$(cloud-upload)"
+      },
       {
         "command": "bicep.showVisualizer",
         "title": "Open Bicep Visualizer",
@@ -411,6 +419,11 @@
           "group": "0_bicep"
         },
         {
+          "command": "bicep.showDeployPane",
+          "group": "0_bicep",
+          "when": "editorLangId == bicep"
+        },
+        {
           "command": "bicep.showVisualizer",
           "group": "0_bicep"
         },
@@ -574,6 +587,7 @@
     "@typescript-eslint/parser": "^5.46.0",
     "@vscode/test-electron": "^2.2.0",
     "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^6.7.3",
     "esbuild-loader": "^2.20.0",
     "eslint": "^8.29.0",
     "eslint-config-prettier": "^8.5.0",
@@ -592,6 +606,7 @@
     "react-test-renderer": "^18.2.0",
     "rimraf": "^3.0.2",
     "semver": "^7.3.8",
+    "style-loader": "^3.3.1",
     "svg-inline-loader": "^0.8.2",
     "terser-webpack-plugin": "5.3.6",
     "ts-jest": "^27.1.4",
@@ -608,6 +623,7 @@
     "@azure/identity": "^3.1.2",
     "@microsoft/vscode-azext-azureutils": "^0.3.5",
     "@microsoft/vscode-azext-utils": "^0.3.15",
+    "@vscode/webview-ui-toolkit": "^1.2.0",
     "cytoscape": "^3.23.0",
     "cytoscape-elk": "^2.1.0",
     "fs-extra": "^11.1.0",

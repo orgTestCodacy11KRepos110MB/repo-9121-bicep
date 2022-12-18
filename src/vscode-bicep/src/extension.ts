@@ -31,6 +31,7 @@ import {
 import { CreateBicepConfigurationFile } from "./commands/createConfigurationFile";
 import { DecompileCommand } from "./commands/decompile";
 import { ImportKubernetesManifestCommand } from "./commands/importKubernetesManifest";
+import { ShowDeployPaneCommand } from "./commands/showDeployPane";
 import { BicepCacheContentProvider, createLanguageService } from "./language";
 import { TreeManager } from "./tree/TreeManager";
 import { updateUiContext } from "./updateUiContext";
@@ -44,6 +45,7 @@ import {
 import { createAzExtOutputChannel } from "./utils/AzExtOutputChannel";
 import { OutputChannelManager } from "./utils/OutputChannelManager";
 import { BicepVisualizerViewManager } from "./visualizer";
+import { DeployPaneViewManager } from "./panes/deploy";
 
 let languageClient: lsp.LanguageClient | null = null;
 
@@ -118,6 +120,10 @@ export async function activate(context: ExtensionContext): Promise<void> {
           new TreeManager(outputChannelManager)
         );
 
+        const deployPaneViewManager = extension.register(
+          new DeployPaneViewManager(actionContext, extension.extensionUri, languageClient, treeManager)
+        );
+
         // Register commands.
         await extension
           .register(new CommandManager(context))
@@ -139,6 +145,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
             new ShowVisualizerCommand(viewManager),
             new ShowVisualizerToSideCommand(viewManager),
             new ShowSourceCommand(viewManager),
+            new ShowDeployPaneCommand(deployPaneViewManager),
             new WalkthroughCopyToClipboardCommand(),
             new WalkthroughCreateBicepFileCommand(),
             new WalkthroughOpenBicepFileCommand(),
