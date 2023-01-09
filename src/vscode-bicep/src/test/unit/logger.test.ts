@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-jest.mock("winston", () => ({
+jest.mock<object>("winston", () => ({
   createLogger: () => mockWinstonLogger,
   format: {
     combine: jest.fn(),
