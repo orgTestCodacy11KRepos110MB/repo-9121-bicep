@@ -1,9 +1,12 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Azure.Deployments.Core.Extensions;
 using Bicep.Core;
 using Bicep.Core.Diagnostics;
 using Bicep.Core.FileSystem;
+using Bicep.Core.Parsing;
+using Bicep.Core.Syntax;
 using Bicep.Decompiler;
 using Bicep.LanguageServer.Telemetry;
 using Microsoft.WindowsAzure.ResourceStack.Common.Extensions;
@@ -21,8 +24,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Bicep.LanguageServer.Handlers
 {
@@ -56,6 +61,7 @@ namespace Bicep.LanguageServer.Handlers
         public const string PasteType_FullTemplate = "fullTemplate"; // Full template
         public const string PasteType_SingleResource = "resource"; // Single resource
         public const string PasteType_ResourceList = "resourceList"; // List of multiple resources
+        public const string PasteType_JsonValue = "jsonValue"; // Single JSON value (number, object, array etc)
 
         private record ResultAndTelemetry(BicepDecompileForPasteCommandResult Result, BicepTelemetryEvent? SuccessTelemetry);
 
@@ -85,9 +91,16 @@ namespace Bicep.LanguageServer.Handlers
             StringBuilder output = new StringBuilder();
             string decompileId = Guid.NewGuid().ToString();
 
-            var (pasteType, constructedJsonTemplate, needsDisclaimer) = ConstructFullJsonTemplate(json);
+            var (pasteType, constructedJsonTemplate, needsDisclaimer) = TryConstructFullJsonTemplate(json);
             if (pasteType is null)
             {
+                // It's not a template or resource.  Try treating it as a JSON value.
+                var resultAndTelemetry = TryConvertFromJsonValue(output, json, decompileId, queryCanPaste);
+                if (resultAndTelemetry is not null)
+                {
+                    return resultAndTelemetry;
+                }
+
                 // It's not anything we know how to convert to Bicep
                 return new ResultAndTelemetry(
                     new BicepDecompileForPasteCommandResult(
@@ -105,14 +118,7 @@ namespace Bicep.LanguageServer.Handlers
                 var singleFileResolver = new SingleFileResolver(JsonDummyUri, constructedJsonTemplate);
 
                 var decompiler = new BicepDecompiler(this.bicepCompiler, singleFileResolver);
-                var options = new DecompileOptions()
-                {
-                    // For partial template pastes, we don't error out on missing parameters and variables because they won't
-                    //   ever have definitions in the pasted portion
-                    AllowMissingParamsAndVars = pasteType != PasteType_FullTemplate,
-                    // ... but don't allow them in nested templates, which should be fully complete and valid
-                    AllowMissingParamsAndVarsInNestedTemplates = false
-                };
+                var options = GetDecompileOptions(pasteType);
                 (_, filesToSave) = await decompiler.Decompile(JsonDummyUri, BicepDummyUri, options);
             }
             catch (Exception ex)
@@ -128,6 +134,7 @@ namespace Bicep.LanguageServer.Handlers
                     GetSuccessTelemetry(queryCanPaste, decompileId, json, pasteType, bicep: null));
             }
 
+            //asdfg refactor
             // Show disclaimer and completion
             string disclaimerMessage = "";
             if (needsDisclaimer)
@@ -166,10 +173,55 @@ namespace Bicep.LanguageServer.Handlers
                 BicepTelemetryEvent.DecompileForPaste(decompileId, pasteType, json.Length, bicep?.Length);
         }
 
+        private DecompileOptions GetDecompileOptions(string pasteType)
+        {
+            return new DecompileOptions()
+            {
+                // For partial template pastes, we don't error out on missing parameters and variables because they won't
+                //   ever have definitions in the pasted portion
+                AllowMissingParamsAndVars = pasteType != PasteType_FullTemplate,
+                // ... but don't allow them in nested templates, which should be fully complete and valid
+                AllowMissingParamsAndVarsInNestedTemplates = false
+            };
+        }
+
+        private ResultAndTelemetry? TryConvertFromJsonValue(StringBuilder output, string json, string decompileId, bool queryCanPaste)
+        {
+            Log(output, String.Format(LangServerResources.Decompile_DecompilationStartMsg, "clipboard text"));
+            var singleFileResolver = new SingleFileResolver(JsonDummyUri, json); //asdfg
+
+            var decompiler = new BicepDecompiler(this.bicepCompiler, singleFileResolver);
+            var pasteType = PasteType_JsonValue;
+            var options = GetDecompileOptions(pasteType);
+            var bicep = decompiler.DecompileJsonValue(json, options);
+            if (bicep is not null)
+            {
+                // If the input was already a valid Bicep expression (i.e., the conversion looks the same as the original, once formatting
+                //   changes are ignored), then skip the conversion, otherwise the user will see formatting changes when copying Bicep values
+                //   to Bicep (e.g. [1] would get changed to a multi-line array).
+                // This will mainly happen with single-line arrays and objects, especially since the Newtonsoft parser accepts input that is
+                //   JavaScript but not technically JSON, such as '{ abc: 1, def: 'def' }, but which also happens to be valid Bicep.
+                Parser parser = new Parser("var v = " + json);
+                if (!parser.Program().HasParseErrors())
+                {
+                    // Already valid Bicep
+                    return null;
+                }
+
+                return new ResultAndTelemetry(
+                    new BicepDecompileForPasteCommandResult(
+                        decompileId, output.ToString(), pasteType,
+                        ErrorMessage: null, bicep, Disclaimer: null),
+                    GetSuccessTelemetry(queryCanPaste, decompileId, json, pasteType, bicep: null));
+            }
+
+            return null;
+        }
+
         /// <summary>
         /// If the given JSON matches a pattern that we know how to paste as Bicep, convert it into a full template to be decompiled
         /// </summary>
-        private (string? pasteType, string? fullJsonTemplate, bool needsDisclaimer) ConstructFullJsonTemplate(string json)
+        private (string? pasteType, string? fullJsonTemplate, bool needsDisclaimer) TryConstructFullJsonTemplate(string json)
         {
             using var streamReader = new StringReader(json);
             using var reader = new JsonTextReader(streamReader);
@@ -304,7 +356,7 @@ namespace Bicep.LanguageServer.Handlers
                     return null;
                 }
 
-                return JContainer.Load(reader, new JsonLoadSettings
+                return JToken.Load(reader, new JsonLoadSettings
                 {
                     CommentHandling = CommentHandling.Ignore,
                 });
@@ -315,10 +367,10 @@ namespace Bicep.LanguageServer.Handlers
             }
         }
 
-        public static JProperty? TryGetProperty(JObject obj, string name)
+        private static JProperty? TryGetProperty(JObject obj, string name)
             => obj.Property(name, StringComparison.OrdinalIgnoreCase);
 
-        public static string? TryGetStringProperty(JObject obj, string name)
+        private static string? TryGetStringProperty(JObject obj, string name)
             => (TryGetProperty(obj, name)?.Value as JValue)?.Value as string;
     }
 
