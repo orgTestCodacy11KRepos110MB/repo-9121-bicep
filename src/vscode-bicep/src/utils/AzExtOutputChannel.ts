@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 import { IAzExtOutputChannel } from "@microsoft/vscode-azext-utils";
 import { OutputChannel, ViewColumn, window } from "vscode";
-import { getBicepConfiguration } from "../language/getBicepConfiguration";
+import { getBicepConfiguration } from "../vscodeIntegration/getBicepConfiguration";
 import { removePropertiesWithPossibleUserInfoInDeployParams } from "./removePropertiesWithPossibleUserInfo";
 
 // https://github.com/microsoft/vscode-azuretools/blob/main/utils/src/AzExtOutputChannel.ts

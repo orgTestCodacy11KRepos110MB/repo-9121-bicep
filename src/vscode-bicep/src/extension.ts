@@ -49,6 +49,8 @@ import {
   bicepLanguageId,
 } from "./language/constants";
 import { SuppressedWarningsManager } from "./commands/SuppressedWarningsManager";
+import { setGlobalStateKeysToSyncBetweenMachines } from "./globalState";
+import { SurveyManager } from "./feedback/SurveyManager";
 
 let languageClient: lsp.LanguageClient | null = null;
 
@@ -77,30 +79,32 @@ export async function activateWithProgressReport(
   );
 }
 
-export async function activate(context: ExtensionContext): Promise<void> {
-  const extension = BicepExtension.create(context);
+export async function activate(
+  extensionContext: ExtensionContext
+): Promise<void> {
+  const extension = BicepExtension.create(extensionContext);
   const outputChannel = createAzExtOutputChannel(
     "Bicep",
     bicepConfigurationPrefix
   );
 
   extension.register(outputChannel);
-  extension.register(createLogger(context, outputChannel));
+  extension.register(createLogger(extensionContext, outputChannel));
 
-  registerUIExtensionVariables({ context, outputChannel });
+  registerUIExtensionVariables({ context: extensionContext, outputChannel });
   registerAzureUtilsExtensionVariables({
-    context,
+    context: extensionContext,
     outputChannel,
     prefix: bicepLanguageId,
   });
 
-  // Launch language server
+  // Activate and launch language server
   await activateWithTelemetryAndErrorHandling(
     async (actionContext) =>
       await activateWithProgressReport(async () => {
         languageClient = await createLanguageService(
           actionContext,
-          context,
+          extensionContext,
           outputChannel
         );
 
@@ -113,6 +117,19 @@ export async function activate(context: ExtensionContext): Promise<void> {
             new BicepCacheContentProvider(languageClient)
           )
         );
+
+        setGlobalStateKeysToSyncBetweenMachines(extensionContext.globalState);
+
+        // Set up surveys
+        const surveyManager = new SurveyManager(extensionContext.globalState);
+        surveyManager.registerActiveUsageNoThrow(); //asdfg   use timer instead?
+        actionContext.telemetry.properties.neverShowSurveys = String(
+          surveyManager.getShouldNeverShowSurveys()
+        ); // Goes on bicep.activate event
+        setInterval(() => {
+          //asdfg
+          surveyManager.registerActiveUsageNoThrow();
+        }, 1000);
 
         const viewManager = extension.register(
           new BicepVisualizerViewManager(extension.extensionUri, languageClient)
@@ -135,7 +152,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
           suppressedWarningsManager
         );
         await extension
-          .register(new CommandManager(context))
+          .register(new CommandManager(extensionContext))
           .registerCommands(
             new BuildCommand(languageClient, outputChannelManager),
             new GenerateParamsCommand(languageClient, outputChannelManager),
@@ -161,6 +178,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
             new ImportKubernetesManifestCommand(languageClient)
           );
 
+        // Register events
         pasteAsBicepCommand.registerForPasteEvents(extension);
 
         extension.register(

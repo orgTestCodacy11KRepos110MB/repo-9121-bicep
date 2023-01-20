@@ -29,8 +29,11 @@ import {
   BicepDecompileForPasteCommandResult,
 } from "../language";
 import { OutputChannelManager } from "../utils/OutputChannelManager";
-import { getBicepConfiguration } from "../language/getBicepConfiguration";
-import { SuppressedWarningsManager } from "./SuppressedWarningsManager";
+import { getBicepConfiguration } from "../vscodeIntegration/getBicepConfiguration";
+import {
+  SuppressedWarningsKeys,
+  SuppressedWarningsManager,
+} from "./SuppressedWarningsManager";
 
 export class PasteAsBicepCommand implements Command {
   public readonly id = "bicep.pasteAsBicep";
@@ -241,7 +244,7 @@ export class PasteAsBicepCommand implements Command {
     if (
       this.disclaimerShownThisSession ||
       this.suppressedWarningsManager.isWarningSuppressed(
-        SuppressedWarningsManager.keys.decompileOnPasteWarning
+        SuppressedWarningsKeys.decompileOnPasteWarning
       )
     ) {
       return;
@@ -262,7 +265,7 @@ export class PasteAsBicepCommand implements Command {
     );
     if (result === dontShowAgain) {
       await this.suppressedWarningsManager.suppressWarning(
-        SuppressedWarningsManager.keys.decompileOnPasteWarning
+        SuppressedWarningsKeys.decompileOnPasteWarning
       );
     } else if (result === disable) {
       this.outputChannelManager.appendToOutputChannel(

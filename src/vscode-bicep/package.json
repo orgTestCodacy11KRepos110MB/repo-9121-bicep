@@ -54,8 +54,7 @@
     "onWebviewPanel:bicep.visualizer"
   ],
   "main": "./out/extension",
-  "enabledApiProposals": [
-  ],
+  "enabledApiProposals": [],
   "contributes": {
     "configurationDefaults": {
       "[bicep]": {
@@ -87,7 +86,10 @@
           "description": "Warnings that are being suppressed because a 'Don't show again' button was pressed. Remove items to reset.",
           "default": [],
           "items": {
-            "type": "string"
+            "type": "string",
+            "oneOf": [
+              "decompile on paste"
+            ]
           }
         },
         "bicep.trace.server": {
@@ -649,6 +651,7 @@
     "cytoscape": "^3.23.0",
     "cytoscape-elk": "^2.1.0",
     "fs-extra": "^11.1.0",
+    "got": "^12.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^4.7.1",

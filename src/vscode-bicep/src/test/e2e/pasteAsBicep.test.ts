@@ -3,7 +3,7 @@
 
 import vscode, { ConfigurationTarget } from "vscode";
 import { executeCloseAllEditors } from "./commands";
-import { getBicepConfiguration } from "../../language/getBicepConfiguration";
+import { getBicepConfiguration } from "../../vscodeIntegration/getBicepConfiguration";
 import { until } from "../utils/time";
 import { normalizeMultilineString } from "../utils/normalizeMultilineString";
 import { SuppressedWarningsManager } from "../../commands/SuppressedWarningsManager";
