@@ -124,7 +124,7 @@ export async function activate(
         const surveyManager = new SurveyManager(extensionContext.globalState);
         surveyManager.registerActiveUsageNoThrow(); //asdfg   use timer instead?
         actionContext.telemetry.properties.neverShowSurveys = String(
-          surveyManager.getShouldNeverShowSurveys()
+          surveyManager.getShouldNeverShowSurvey()
         ); // Goes on bicep.activate event
         setInterval(() => {
           //asdfg

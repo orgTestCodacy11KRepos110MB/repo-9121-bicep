@@ -8,11 +8,9 @@ import {
   window,
   WorkspaceConfiguration,
 } from "vscode";
-import {
-  parseError,
-  callWithTelemetryAndErrorHandling,
-  IActionContext,
-} from "@microsoft/vscode-azext-utils";
+import { parseError } from "@microsoft/vscode-azext-utils";
+import { IActionContext } from "@microsoft/vscode-azext-utils";
+import { callWithTelemetryAndErrorHandling } from "@microsoft/vscode-azext-utils";
 import assert from "assert";
 import {
   daysToMs,
@@ -22,7 +20,7 @@ import {
   weeksToMs,
 } from "../utils";
 import { GlobalState, GlobalStateKeys } from "../globalState";
-import { got } from "got";
+//import { got } from "got";
 import { getBicepConfiguration } from "../vscodeIntegration/getBicepConfiguration";
 
 //asdfg too much telemetry?
@@ -75,14 +73,20 @@ export class SurveyManager {
   private isReentrant = false;
   private surveyDisabledThisSession = false;
   private isDebugMode: boolean | undefined = undefined;
+  private readonly provideBicepConfiguration: () => WorkspaceConfiguration;
 
   public constructor(
     private globalState: GlobalState,
-    private readonly provideBicepConfiguration: () => WorkspaceConfiguration = getBicepConfiguration // override for unit testing    asdfg needed?
-  ) {}
+    injectableContext?: {
+      readonly provideBicepConfiguration: () => WorkspaceConfiguration;
+    }
+  ) {
+    this.provideBicepConfiguration =
+      injectableContext?.provideBicepConfiguration ?? getBicepConfiguration;
+  }
 
   /**
-   * Called whenever the user is interacting with the extension (thus gets called a lot)
+   * Should be called whenever the user is interacting with the extension (thus gets called a lot)  asdfg
    */
   public registerActiveUsageNoThrow(): void {
     if (this.isReentrant) {
@@ -94,7 +98,7 @@ export class SurveyManager {
       "considerShowingSurvey",
       async (context: IActionContext) => {
         context.errorHandling.suppressDisplay = true;
-        // This gets called a lot, we don't want telemetry for most of them
+        // This gets called a lot, we don't want telemetry for most calls
         context.telemetry.suppressIfSuccessful = true;
 
         if (this.isReentrant) {
@@ -108,7 +112,7 @@ export class SurveyManager {
             return;
           }
 
-          const neverShowSurveys = this.getShouldNeverShowSurveys();
+          const neverShowSurveys = this.getShouldNeverShowSurvey();
           context.telemetry.properties.neverShowSurvey =
             String(neverShowSurveys);
           if (neverShowSurveys) {
@@ -160,8 +164,7 @@ export class SurveyManager {
       }
     ).catch((err: unknown) => {
       assert.fail(
-        `callWithTelemetryAndErrorHandling in survey.registerActiveUseNoThrow shouldn't throw, but did: ${
-          parseError(err).message
+        `callWithTelemetryAndErrorHandling in survey.registerActiveUseNoThrow shouldn't throw, but did: ${parseError(err).message
         }`
       );
     });
@@ -177,7 +180,7 @@ export class SurveyManager {
 
         // Turn off the never show flag (until user selects it again)
         this.surveyDisabledThisSession = false;
-        await this.setShouldNeverShowSurveys(context, false);
+        await this.setShouldNeverShowSurvey(context, false);
       }
     }
 
@@ -202,7 +205,7 @@ export class SurveyManager {
     context.telemetry.properties.response = String(response.title);
 
     if (response === neverAskAgain) {
-      await this.setShouldNeverShowSurveys(context, true);
+      await this.setShouldNeverShowSurvey(context, true);
     } else if (response === later) {
       await this.postponeSurvey(
         context,
@@ -264,24 +267,25 @@ export class SurveyManager {
 
   private async getIsSurveyAccessible(): Promise<boolean> {
     try {
-      const asdfg = await got(linkToSurvey, {
-        throwHttpErrors: false,
-        maxRedirects: 0,
-      });
-      return !!asdfg;
+      return false; //asdfg
+      // const asdfg = await got(linkToSurvey, {
+      //   throwHttpErrors: false,
+      //   maxRedirects: 0,
+      // });
+      // return !!asdfg;
     } catch (err) {
       return false;
     }
   }
 
-  public getShouldNeverShowSurveys(): boolean {
+  public getShouldNeverShowSurvey(): boolean {
     return this.globalState.get<boolean>(
       GlobalStateKeys.neverShowSurveys,
       false
     );
   }
 
-  private async setShouldNeverShowSurveys(
+  private async setShouldNeverShowSurvey(
     context: IActionContext,
     neverShowSurveys: boolean
   ): Promise<void> {

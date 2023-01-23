@@ -14,6 +14,9 @@ export type GlobalState = Memento & {
   setKeysForSync(keys: readonly string[]): void;
 };
 
+/**
+ * Call this once on activation to set the keys that should be synced between machines.
+ */
 export function setGlobalStateKeysToSyncBetweenMachines(
   globalState: GlobalState
 ) {

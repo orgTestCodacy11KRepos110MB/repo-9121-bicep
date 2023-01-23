@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+
+
 jest.mock(
   "vscode",
   () => ({
@@ -14,6 +16,8 @@ jest.mock(
       registerCodeLensProvider: jest.fn(),
     },
     StatusBarAlignment: { Left: 1, Right: 2 },
+    ThemeColor: jest.fn(),
+    ThemeIcon: jest.fn(),
     window: {
       createStatusBarItem: jest.fn(() => ({
         show: jest.fn(),
