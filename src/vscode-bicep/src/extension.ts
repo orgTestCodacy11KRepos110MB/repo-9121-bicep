@@ -120,16 +120,9 @@ export async function activate(
 
         setGlobalStateKeysToSyncBetweenMachines(extensionContext.globalState);
 
-        // Set up surveys
+        // Consider showing survey
         const surveyManager = new SurveyManager(extensionContext.globalState);
-        surveyManager.registerActiveUsageNoThrow(); //asdfg   use timer instead?
-        actionContext.telemetry.properties.neverShowSurveys = String(
-          surveyManager.getShouldNeverShowSurvey()
-        ); // Goes on bicep.activate event
-        setInterval(() => {
-          //asdfg
-          surveyManager.registerActiveUsageNoThrow();
-        }, 1000);
+        surveyManager.considerShowingSurvey();
 
         const viewManager = extension.register(
           new BicepVisualizerViewManager(extension.extensionUri, languageClient)

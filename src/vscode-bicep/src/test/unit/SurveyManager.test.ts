@@ -38,7 +38,7 @@ describe("surveyManager", () => {
         ),
     });
 
-    sm.registerActiveUsageNoThrow();
+    sm.considerShowingSurvey();
     expect(gs.update).toHaveBeenCalledWith(
       GlobalStateKeys.surveyPostponedUntilTimeMs,
       expect.any(Number)
