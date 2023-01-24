@@ -37,35 +37,35 @@ const surveyPrompt =
 interface ISurveyConstants {
   // Wait for this amount of time since extension first used (this session) before
   // considering asking the survey (only if still interacting with extension)
-  activeUsageMsBeforeShowingSurvey: number;
-
+  activeUsageBeforeFirstDrawing: number;
+  // How often to consider showing the survey
+  frequencyBetweenDrawings: number;
   percentageOfUsersToSurvey: number;
-  msToPostponeAfterYesResponse: number;
-  msToPostponeAfterLaterResponse: number;
-  msToPostponeAfterNotSelectedForSurvey: number; //asdfg change to easier - surveyFrequencyMs
-  msToPostponeAfterNotAccessible: number;
+  postponeAfterYesResponseMs: number;
+  postponeAfterLaterResponseMs: number;
+  postponeAfterNotAccessibleMs: number;
 }
 
 const defaultSurveyConstants: ISurveyConstants = {
   activeUsageMsBeforeShowingSurvey: hoursToMs(1),
   percentageOfUsersToSurvey: 0.25,
-  msToPostponeAfterYesResponse: weeksToMs(12),
-  msToPostponeAfterLaterResponse: weeksToMs(1),
+  postponeAfterYesResponseMs: weeksToMs(12),
+  postponeAfterLaterResponseMs: weeksToMs(1),
   msToPostponeAfterNotSelectedForSurvey: weeksToMs(12),
-  msToPostponeAfterNotAccessible: daysToMs(1),
+  postponeAfterNotAccessibleMs: daysToMs(1),
 };
 const debugSurveyConstants: ISurveyConstants = {
   //asdfg?
   activeUsageMsBeforeShowingSurvey: secondsToMs(30),
   percentageOfUsersToSurvey: 0.5,
-  msToPostponeAfterYesResponse: minutesToMs(2),
-  msToPostponeAfterLaterResponse: minutesToMs(1),
+  postponeAfterYesResponseMs: minutesToMs(2),
+  postponeAfterLaterResponseMs: minutesToMs(1),
   msToPostponeAfterNotSelectedForSurvey: minutesToMs(0.5),
-  msToPostponeAfterNotAccessible: minutesToMs(0.25),
+  postponeAfterNotAccessibleMs: minutesToMs(0.25),
 };
 
 export class SurveyManager {
-  private surveyConstants: ISurveyConstants = defaultSurveyConstants;
+  private surveyConstants: ISurveyConstants;
 
   // Time user started interacting with extension this session of VS Code
   private usageSessionStartMs: number | undefined;
@@ -78,11 +78,14 @@ export class SurveyManager {
   public constructor(
     private globalState: GlobalState,
     injectableContext?: {
-      readonly provideBicepConfiguration: () => WorkspaceConfiguration;
+      provideBicepConfiguration: () => WorkspaceConfiguration;
+      surveyConstants: ISurveyConstants;
     }
   ) {
     this.provideBicepConfiguration =
       injectableContext?.provideBicepConfiguration ?? getBicepConfiguration;
+    this.surveyConstants =
+      injectableContext?.surveyConstants ?? defaultSurveyConstants;
   }
 
   /**
@@ -143,7 +146,7 @@ export class SurveyManager {
             // Try again after a while
             await this.postponeSurvey(
               context,
-              this.surveyConstants.msToPostponeAfterNotAccessible
+              this.surveyConstants.postponeAfterNotAccessibleMs
             );
             return;
           }
@@ -177,8 +180,6 @@ export class SurveyManager {
       if (this.provideBicepConfiguration().get<boolean>("debugSurvey")) {
         this.isDebugMode = true;
         this.surveyConstants = debugSurveyConstants;
-
-        // Turn off the never show flag (until user selects it again)
         this.surveyDisabledThisSession = false;
         await this.setShouldNeverShowSurvey(context, false);
       }
@@ -209,19 +210,19 @@ export class SurveyManager {
     } else if (response === later) {
       await this.postponeSurvey(
         context,
-        this.surveyConstants.msToPostponeAfterLaterResponse
+        this.surveyConstants.postponeAfterLaterResponseMs
       );
     } else if (response === yes) {
       await this.postponeSurvey(
         context,
-        this.surveyConstants.msToPostponeAfterYesResponse
+        this.surveyConstants.postponeAfterYesResponseMs
       );
       await this.launchSurvey(context);
     } else {
       assert(response === dismissed, `Unexpected response: ${response.title}`);
       await this.postponeSurvey(
         context,
-        this.surveyConstants.msToPostponeAfterLaterResponse
+        this.surveyConstants.postponeAfterLaterResponseMs
       );
     }
   }
