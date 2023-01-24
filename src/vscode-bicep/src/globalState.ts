@@ -4,7 +4,7 @@
 import { Memento } from "vscode";
 
 export enum GlobalStateKeys { //asdfg
-  neverShowSurveys = "neverShowSurveys",
+  neverShowSurvey = "neverShowSurvey",
   surveyPostponedUntilTimeMs = "surveyPostponedUntilTimeMs", // asdfg change to lastChecked or something?
 }
 
@@ -21,7 +21,7 @@ export function setGlobalStateKeysToSyncBetweenMachines(
   globalState: GlobalState
 ) {
   globalState.setKeysForSync([
-    GlobalStateKeys.neverShowSurveys,
+    GlobalStateKeys.neverShowSurvey,
     GlobalStateKeys.surveyPostponedUntilTimeMs,
   ]);
 }

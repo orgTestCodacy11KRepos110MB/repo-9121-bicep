@@ -281,7 +281,7 @@ export class SurveyManager {
 
   public getShouldNeverShowSurvey(): boolean {
     return this.globalState.get<boolean>(
-      GlobalStateKeys.neverShowSurveys,
+      GlobalStateKeys.neverShowSurvey,
       false
     );
   }
@@ -294,7 +294,7 @@ export class SurveyManager {
     context.telemetry.suppressIfSuccessful = false;
 
     await this.globalState.update(
-      GlobalStateKeys.neverShowSurveys,
+      GlobalStateKeys.neverShowSurvey,
       neverShowSurveys
     );
   }
